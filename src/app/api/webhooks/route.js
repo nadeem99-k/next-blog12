@@ -2,48 +2,38 @@ import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 
 export async function POST(req) {
-  const SIGNING_SECRET = process.env.SIGNING_SECRET;
+  // You can find this in the Clerk Dashboard -> Webhooks -> choose the endpoint
+  const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
-  if (!SIGNING_SECRET) {
-    return new Response(
-      'Error: Please add SIGNING_SECRET from Clerk Dashboard to .env or .env.local',
-      { status: 500 }
+  if (!WEBHOOK_SECRET) {
+    throw new Error(
+      'Please add WEBHOOK_SECRET from Clerk Dashboard to .env or .env.local'
     );
   }
 
-  // Create new Svix instance with secret
-  const wh = new Webhook(SIGNING_SECRET);
-
-  // Get headers
-  const headerPayload = headers(); // Removed unnecessary `await`
+  // Get the headers
+  const headerPayload = headers();
   const svix_id = headerPayload.get('svix-id');
   const svix_timestamp = headerPayload.get('svix-timestamp');
   const svix_signature = headerPayload.get('svix-signature');
 
   // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    return new Response(
-      `Error: Missing Svix headers (${
-        !svix_id ? 'svix-id' : !svix_timestamp ? 'svix-timestamp' : 'svix-signature'
-      })`,
-      { status: 400 }
-    );
+    return new Response('Error occured -- no svix headers', {
+      status: 400,
+    });
   }
 
-  // Get body
-  let payload;
-  try {
-    payload = await req.json();
-  } catch (err) {
-    console.error('Error parsing JSON payload:', err);
-    return new Response('Error: Invalid JSON payload', { status: 400 });
-  }
-
+  // Get the body
+  const payload = await req.json();
   const body = JSON.stringify(payload);
+
+  // Create a new Svix instance with your secret.
+  const wh = new Webhook(WEBHOOK_SECRET);
 
   let evt;
 
-  // Verify payload with headers
+  // Verify the payload with the headers
   try {
     evt = wh.verify(body, {
       'svix-id': svix_id,
@@ -51,29 +41,26 @@ export async function POST(req) {
       'svix-signature': svix_signature,
     });
   } catch (err) {
-    console.error('Error: Could not verify webhook:', err);
-    return new Response('Error: Verification error', { status: 400 });
+    console.error('Error verifying webhook:', err);
+    return new Response('Error occured', {
+      status: 400,
+    });
   }
 
-  // Log event for debugging
-  console.log(`Received webhook with ID ${evt.data.id} and event type ${evt.type}`);
-  console.log('Webhook payload:', body);
+  // Do something with the payload
+  // For this guide, you simply log the payload to the console
+  const { id } = evt.data;
+  const eventType = evt.type;
+  console.log(`Webhook with and ID of ${id} and type of ${eventType}`);
+  console.log('Webhook body:', body);
 
-  // Handle specific events
-  switch (evt.type) {
-    case 'user.created':
-      console.log('User created with ID:', evt.data.id);
-      break;
-    case 'user.updated':
-      console.log('User updated with ID:', evt.data.id);
-      break;
-    default:
-      console.log(`Unhandled event type: ${evt.type}`);
+  if (evt.type === 'user.created') {
+    console.log('userId:', evt.data.id);
   }
 
-  // Return success response
-  return new Response(JSON.stringify({ success: true, eventType: evt.type }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  if (evt.type === 'user.updated') {
+    console.log('user is updated:', evt.data.id);
+  }
+
+  return new Response('', { status: 200 });
 }
