@@ -4,7 +4,8 @@ export default clerkMiddleware();
 
 export const config = {
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)|sign-in|sign-up).*)',
-    '/(api|trpc)(.*)',
+    // Protect all routes except public assets and auth routes
+    "/((?!_next|static|public|.*\\.(?:js|css|json|html|jpg|jpeg|png|svg|gif|ico|woff|woff2|ttf|map|txt|csv|zip)|sign-in|sign-up).*)",
+    "/(api|trpc)(.*)",
   ],
 };
