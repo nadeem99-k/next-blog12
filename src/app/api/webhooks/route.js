@@ -1,6 +1,6 @@
 import { Webhook } from 'svix';
 import { headers } from 'next/headers';
-import { NEXT_CACHE_IMPLICIT_TAG_ID } from 'next/dist/lib/constants';
+import { createOrUpdateUser, deleteUser } from '@/lib/actions/user';
 
 export async function POST(req) {
   // You can find this in the Clerk Dashboard -> Webhooks -> choose the endpoint
@@ -54,58 +54,48 @@ export async function POST(req) {
   const eventType = evt?.type;
   console.log(`Webhook with and ID of ${id} and type of ${eventType}`);
   console.log('Webhook body:', body);
-  if (eventType === 'user.created' || eventType === 'user.updated'){
-    const {
-      id,
-      first_name,
-      last_name,
-      image_url,
-      email_addresses,
-      username,
 
-    } = evt?.data;
+  if (eventType === 'user.created' || eventType === 'user.updated') {
+    const { id, first_name, last_name, image_url, email_addresses, username } =
+      evt?.data;
 
-    try{
-       const user = await createOrUpdateUser(
+    try {
+      const user = await createOrUpdateUser(
         id,
         first_name,
         last_name,
         image_url,
         email_addresses,
-        username,
-       )
+        username
+      );
 
-       if (user && eventType === 'user.created'){
-     try {
+      if (user && eventType === 'user.created') {
+        try {
           await clerkClient.users.updateUserMetadata(id, {
-             publicMetadata: {
+            publicMetadata: {
               userMongoId: user._id,
               isAdmin: user.isAdmin,
-             }
-          }
-        )
-     } catch (error) {
-      console.log('Error updating user metadata:', error);
-      
-     }
-       
+            },
+          });
+        } catch (error) {
+          console.log('Error updating user metadata:', error);
+        }
+      }
+    } catch (error) {
+      console.log('Error creating or updating user:', error);
+      return new Response('Error occured', { status: 400 });
     }
-} catch (error){
-  console.log('Error creating or updating user:', error);
-return new Response('Error occured', { status: 400});
-}
   }
-  
-  if (eventType === 'user.deleted'){
+
+  if (eventType === 'user.deleted') {
     const { id } = evt?.data;
     try {
       await deleteUser(id);
     } catch (error) {
-      console.log('Error creating or updating user:', error);
-return new Response('Error occured', { status: 400});
+      console.log('Error deleting user:', error);
+      return new Response('Error occured', { status: 400 });
     }
-
   }
- 
+
   return new Response('', { status: 200 });
 }
